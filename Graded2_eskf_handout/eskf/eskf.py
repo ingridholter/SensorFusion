@@ -69,10 +69,11 @@ class ESKF():
         Returns:
             CorrectedImuMeasurement: corrected IMU measurement
         """
-
-        # TODO replace this with your own code
-        z_corr = solution.eskf.ESKF.correct_z_imu(self, x_nom_prev, z_imu)
-
+        corr_acc = self.accm_correction@z_imu.acc
+        corr_avel = self.gyro_correction@z_imu.avel
+        ts = z_imu.ts
+        z_corr = CorrectedImuMeasurement(ts=ts,acc=corr_acc,avel=corr_avel)
+        #z_corr_sol = solution.eskf.ESKF.correct_z_imu(self, x_nom_prev, z_imu)
         return z_corr
 
     def predict_nominal(self,
@@ -91,11 +92,28 @@ class ESKF():
         Returns:
             x_nom_pred (NominalState): predicted nominal state
         """
-
-        # TODO replace this with your own code
-        x_nom_pred = solution.eskf.ESKF.predict_nominal(
+        acc = x_nom_prev.ori.as_rotmat()@(z_corr.acc - x_nom_prev.accm_bias) + self.g
+        avel = z_corr.avel - x_nom_prev.gyro_bias
+        ts = z_corr.ts
+        
+        vel = x_nom_prev.vel + ts * acc
+        pos = x_nom_prev.pos + ts * x_nom_prev.vel + 1/2 * ts**2 * acc
+        
+        k = ts*avel
+        quat = x_nom_prev.ori.multiply(np.array([np.cos(np.linalg.norm(k) / 2),np.sin(np.linalg.norm(k) / 2) * k.T / np.linalg.norm(k)]).T)
+        
+        accm_bias = x_nom_prev.accm_bias - ts*np.eye(3)*x_nom_prev.accm_bias*self.accm_bias_p
+        gyro_bias = x_nom_prev.gyro_bias - ts*np.eye(3)*x_nom_prev.gyro_bias*self.gyro_bias_p
+        
+        x_nom_pred = NominalState(pos= pos, vel= vel, ori= quat, accm_bias=accm_bias,gyro_bias=gyro_bias)
+        x_nom_pred_sol = solution.eskf.ESKF.predict_nominal(
             self, x_nom_prev, z_corr)
-
+        assert np.allclose(pos, x_nom_pred_sol.pos), "Position not correct"
+        assert np.allclose(vel, x_nom_pred_sol.vel), "Velocity not correct"
+        assert np.allclose(quat, x_nom_pred_sol.ori), "Orientation not correct"
+        assert np.allclose(accm_bias, x_nom_pred_sol.accm_bias), "Accelerometer bias not correct"
+        assert np.allclose(gyro_bias, x_nom_pred_sol.gyro_bias), "Gyrometer bias not correct"
+        
         return x_nom_pred
 
     def get_error_A_continous(self,
@@ -115,9 +133,38 @@ class ESKF():
         Returns:
             A (ndarray[15,15]): A
         """
-
+        
+        acc = z_corr.acc - x_nom_prev.accm_bias
+        avel = z_corr.avel - x_nom_prev.gyro_bias
+        p_ab = self.accm_bias_p
+        p_wb = self.gyro_bias_p
+        R_q = NominalState.ori.as_rotmat
+        
+        A = np.zeros(3*5)
+        #first row
+        A[block_3x3(0, 0)] = np.zeros(3)
+        A[block_3x3(0, 1)] = np.eye(3)
+        A[block_3x3(0, 2)] = np.zeros(3)
+        A[block_3x3(0, 3)] = np.zeros(3)
+        A[block_3x3(0, 4)] = np.zeros(3)
+        #second row
+        A[block_3x3(1, 0)] = np.zeros(3)
+        A[block_3x3(1, 1)] = np.zeros(3)
+        A[block_3x3(1, 2)] = -R_q@get_cross_matrix(acc)
+        A[block_3x3(1, 3)] = -R_q
+        A[block_3x3(1, 4)] = np.zeros(3)
+        #third row
+        A[block_3x3(2, 0)] = np.zeros(3)
+        A[block_3x3(2, 1)] = np.zeros(3)
+        A[block_3x3(2, 2)] = get_cross_matrix(avel)
+        A[block_3x3(2, 3)] = 0
+        A[block_3x3(2, 4)] = -np.eye(3)
+        #fourth row
+        #fifth row
+        
+        
         # TODO replace this with your own code
-        A = solution.eskf.ESKF.get_error_A_continous(self, x_nom_prev, z_corr)
+        A_sol = solution.eskf.ESKF.get_error_A_continous(self, x_nom_prev, z_corr)
 
         return A
 
