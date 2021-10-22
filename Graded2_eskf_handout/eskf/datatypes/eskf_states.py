@@ -60,7 +60,9 @@ class ErrorStateGauss(MultiVarGaussStamped):
 
     @property
     def avec(self):
-        """angles vector"""
+        """angles vector
+        this is often called a rotation vector
+        """
         return self.mean[6:9]
 
     @property
