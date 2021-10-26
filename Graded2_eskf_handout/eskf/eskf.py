@@ -69,12 +69,13 @@ class ESKF():
         Returns:
             CorrectedImuMeasurement: corrected IMU measurement
         """
-        # corr_acc = self.accm_correction@(z_imu.acc) + x_nom_prev.accm_bias
-        # corr_avel = self.gyro_correction@(z_imu.avel) - x_nom_prev.gyro_bias
-        # ts = z_imu.ts
-        # z_corr = CorrectedImuMeasurement(ts=ts, acc=corr_acc, avel=corr_avel)
-        z_corr_sol = solution.eskf.ESKF.correct_z_imu(self, x_nom_prev, z_imu)
-        return z_corr_sol
+        corr_acc = self.accm_correction@(z_imu.acc - x_nom_prev.accm_bias)
+        corr_avel = self.gyro_correction@(z_imu.avel - x_nom_prev.gyro_bias)
+        ts = z_imu.ts
+        z_corr = CorrectedImuMeasurement(ts=ts, acc=corr_acc, avel=corr_avel)
+        # z_corr_sol = solution.eskf.ESKF.correct_z_imu(self, x_nom_prev, z_imu)
+        
+        return z_corr
 
     def predict_nominal(self,
                         x_nom_prev: NominalState,
@@ -92,35 +93,30 @@ class ESKF():
         Returns:
             x_nom_pred (NominalState): predicted nominal state
         """
-        # acc = x_nom_prev.ori.as_rotmat()@(z_corr.acc - x_nom_prev.accm_bias) + self.g
-        # avel = z_corr.avel - x_nom_prev.gyro_bias
-        # ts = z_corr.ts
+         
+        ts = z_corr.ts - x_nom_prev.ts
+        
+        accm_bias = x_nom_prev.accm_bias * np.exp(- ts * self.accm_bias_p)
+        gyro_bias = x_nom_prev.gyro_bias * np.exp(- ts * self.gyro_bias_p) 
+        
+        if ts == 0:
+            return NominalState(x_nom_prev.pos, x_nom_prev.vel, x_nom_prev.ori, accm_bias, gyro_bias, z_corr.ts)
 
-        # vel = x_nom_prev.vel + ts * acc
-        # pos = x_nom_prev.pos + ts * x_nom_prev.vel + 1/2 * ts**2 * acc
+        acc = x_nom_prev.ori.as_rotmat() @ z_corr.acc + self.g
+        vel = x_nom_prev.vel + ts * acc
+        pos = x_nom_prev.pos + ts * x_nom_prev.vel + 1/2 * ts**2 * acc
 
-        # k = ts*avel
-        # quat = x_nom_prev.ori.multiply(RotationQuaterion(real_part=np.cos(np.linalg.norm(
-        #     k) / 2), vec_part=k.T * np.sin(np.linalg.norm(k) / 2) / np.linalg.norm(k)))
+        k = ts * z_corr.avel
+        quat = x_nom_prev.ori.multiply(RotationQuaterion(real_part=np.cos(np.linalg.norm(
+            k) / 2), vec_part=k.T * np.sin(np.linalg.norm(k) / 2) / np.linalg.norm(k)))
 
-        # accm_bias = x_nom_prev.accm_bias - ts *  \
-        #     np.eye(3)*x_nom_prev.accm_bias*self.accm_bias_p
-        # gyro_bias = x_nom_prev.gyro_bias - ts * \
-        #     np.eye(3)*x_nom_prev.gyro_bias*self.gyro_bias_p
 
-        # x_nom_pred = NominalState(
-        #     pos=pos, vel=vel, ori=quat, accm_bias=accm_bias, gyro_bias=gyro_bias)
-        x_nom_pred_sol = solution.eskf.ESKF.predict_nominal(
-            self, x_nom_prev, z_corr)
-        # assert np.allclose(pos, x_nom_pred_sol.pos), "Position not correct"
-        # assert np.allclose(vel, x_nom_pred_sol.vel), "Velocity not correct"
-        # assert np.allclose(quat, x_nom_pred_sol.ori), "Orientation not correct"
-        # assert np.allclose(
-        #     accm_bias, x_nom_pred_sol.accm_bias), "Accelerometer bias not correct"
-        # assert np.allclose(
-        #     gyro_bias, x_nom_pred_sol.gyro_bias), "Gyrometer bias not correct"
+        x_nom_pred = NominalState(
+            pos=pos, vel=vel, ori=quat, accm_bias=accm_bias, gyro_bias=gyro_bias, ts=z_corr.ts)
+        # x_nom_pred_sol = solution.eskf.ESKF.predict_nominal(
+        #     self, x_nom_prev, z_corr)
 
-        return x_nom_pred_sol
+        return x_nom_pred
 
     def get_error_A_continous(self,
                               x_nom_prev: NominalState,
@@ -143,29 +139,28 @@ class ESKF():
             A (ndarray[15,15]): A
         """
 
-        acc = z_corr.acc - x_nom_prev.accm_bias
-        avel = z_corr.avel - x_nom_prev.gyro_bias
+        acc = z_corr.acc #- x_nom_prev.accm_bias
+        avel = z_corr.avel #- x_nom_prev.gyro_bias
         p_ab = self.accm_bias_p
         p_wb = self.gyro_bias_p
-        R_q = x_nom_prev.ori.as_rotmat
+        R_q = x_nom_prev.ori.as_rotmat()
 
-        A = np.zeros(15, 15)
+        A = np.zeros((15,15))
         # first row
         A[block_3x3(0, 1)] = np.eye(3)
         # second row
         A[block_3x3(1, 2)] = -R_q@get_cross_matrix(acc)
-        A[block_3x3(1, 3)] = -R_q
+        A[block_3x3(1, 3)] = -R_q @ self.accm_correction
         # third row
-        A[block_3x3(2, 2)] = get_cross_matrix(avel)
-        A[block_3x3(2, 4)] = -np.eye(3)
+        A[block_3x3(2, 2)] = -get_cross_matrix(avel)
+        A[block_3x3(2, 4)] = -np.eye(3) @ self.gyro_correction
         # fourth row
-        A[block_3x3(3, 3)] = -p_ab*self.accm_correction
+        A[block_3x3(3, 3)] = -p_ab*np.eye(3)
         # fifth row
-        A[block_3x3(4, 4)] = -p_wb*self.gyro_correction
+        A[block_3x3(4, 4)] = -p_wb*np.eye(3)
 
-        A_sol = solution.eskf.ESKF.get_error_A_continous(
-            self, x_nom_prev, z_corr)
-        return A_sol
+        #A_sol = solution.eskf.ESKF.get_error_A_continous(self, x_nom_prev, z_corr)
+        return A
 
     def get_error_GQGT_continous(self,
                                  x_nom_prev: NominalState
@@ -185,8 +180,8 @@ class ESKF():
         Returns:
             GQGT (ndarray[15, 15]): G @ Q @ G.T
         """
-        R_q = x_nom_prev.ori.as_rotmat
-        G = np.zeros(15, 12)
+        R_q = x_nom_prev.ori.as_rotmat()
+        G = np.zeros([15, 12])
         # second row
         G[block_3x3(1, 0)] = -R_q
         # third row
@@ -196,10 +191,10 @@ class ESKF():
         # fifth row
         G[block_3x3(4, 3)] = np.eye(3)
 
-        GQGT_sol = solution.eskf.ESKF.get_error_GQGT_continous(
-            self, x_nom_prev)
+        # GQGT_sol = solution.eskf.ESKF.get_error_GQGT_continous(
+        #     self, x_nom_prev)
         GQGT = G @ self.Q_err @ G.T
-        return GQGT_sol
+        return GQGT
 
     def get_van_loan_matrix(self, V: 'ndarray[30, 30]'):
         """Use this funciton in get_discrete_error_diff to get the van loan
@@ -241,10 +236,18 @@ class ESKF():
             Ad (ndarray[15, 15]): discrede transition matrix
             GQGTd (ndarray[15, 15]): discrete noise covariance matrix
         """
-
-        # TODO replace this with your own code
-        Ad, GQGTd = solution.eskf.ESKF.get_discrete_error_diff(
-            self, x_nom_prev, z_corr)
+        A = self.get_error_A_continous(x_nom_prev,z_corr)
+        GQGT = self.get_error_GQGT_continous(x_nom_prev)
+        
+        ts = z_corr.ts - x_nom_prev.ts
+        pre_van_loan = np.block([[ -A, GQGT ],[np.zeros((15,15)), A.T ] ] ) * ts
+        post_van_loan = self.get_van_loan_matrix(pre_van_loan)
+        
+        Ad = post_van_loan[15:30,15:30].T
+        GQGTd = Ad@post_van_loan[0:15,15:30]
+        
+        # Ad_sol, GQGTd_sol = solution.eskf.ESKF.get_discrete_error_diff(
+        #     self, x_nom_prev, z_corr)
 
         return Ad, GQGTd
 
@@ -266,10 +269,12 @@ class ESKF():
         Returns:
             x_err_pred (ErrorStateGauss): predicted error state
         """
-
-        # TODO replace this with your own code
-        x_err_pred = solution.eskf.ESKF.predict_x_err(
-            self, x_nom_prev, x_err_prev_gauss, z_corr)
+        Ad, GQGTd = self.get_discrete_error_diff(x_nom_prev,z_corr)
+        x_err_pred_mean = Ad@x_err_prev_gauss.mean
+        x_err_pred_cov = Ad@x_err_prev_gauss.cov@Ad.T+GQGTd
+        
+        x_err_pred= ErrorStateGauss(x_err_pred_mean,x_err_pred_cov,z_corr.ts)
+        #x_err_pred_sol = solution.eskf.ESKF.predict_x_err(self, x_nom_prev, x_err_prev_gauss, z_corr)
 
         return x_err_pred
 
@@ -289,10 +294,11 @@ class ESKF():
             x_nom_pred (NominalState): predicted nominal state
             x_err_pred (ErrorStateGauss): predicted error state
         """
-
-        # TODO replace this with your own code
-        x_nom_pred, x_err_pred = solution.eskf.ESKF.predict_from_imu(
-            self, x_nom_prev, x_err_gauss, z_imu)
+        z_corr = self.correct_z_imu(x_nom_prev,z_imu)
+        x_nom_pred = self.predict_nominal(x_nom_prev,z_corr)
+        x_err_pred = self.predict_x_err(x_nom_prev,x_err_gauss,z_corr)
+        # x_nom_pred_sol, x_err_pred_sol = solution.eskf.ESKF.predict_from_imu(
+        #     self, x_nom_prev, x_err_gauss, z_imu)
 
         return x_nom_pred, x_err_pred
 
@@ -306,9 +312,12 @@ class ESKF():
         Returns:
             H (ndarray[3, 15]): [description]
         """
-
-        # TODO replace this with your own code
-        H = solution.eskf.ESKF.get_gnss_measurment_jac(self, x_nom)
+        
+        H= np.zeros([3,15])
+        H[block_3x3(0,0)] = np.eye(3)
+        H[block_3x3(0,2)] = -x_nom.ori.as_rotmat()@get_cross_matrix(self.lever_arm)
+    
+        # H_sol = solution.eskf.ESKF.get_gnss_measurment_jac(self, x_nom)
 
         return H
 
@@ -351,10 +360,17 @@ class ESKF():
         Returns:
             z_gnss_pred_gauss (MultiVarGaussStamped): gnss prediction gaussian
         """
-
-        # TODO replace this with your own code
-        z_gnss_pred_gauss = solution.eskf.ESKF.predict_gnss_measurement(
-            self, x_nom, x_err, z_gnss)
+        R = self.get_gnss_cov(z_gnss)
+        H = self.get_gnss_measurment_jac(x_nom)
+        P = x_err.cov
+        
+        z_mean = x_nom.pos + x_nom.ori.as_rotmat() @ self.lever_arm
+        z_cov = H @ P @ H.T + R
+        
+        z_gnss_pred_gauss =MultiVarGaussStamped(z_mean,z_cov,ts=z_gnss.ts)
+        
+        # z_gnss_pred_gauss_sol = solution.eskf.ESKF.predict_gnss_measurement(
+        #     self, x_nom, x_err, z_gnss)
 
         return z_gnss_pred_gauss
 
@@ -382,10 +398,20 @@ class ESKF():
         Returns:
             x_err_upd_gauss (ErrorStateGauss): updated error state gaussian
         """
-
-        # TODO replace this with your own code
-        x_err_upd_gauss = solution.eskf.ESKF.get_x_err_upd(
-            self, x_nom, x_err, z_gnss_pred_gauss, z_gnss)
+        H = self.get_gnss_measurment_jac(x_nom)
+        P = x_err.cov #error state covariance
+        R = self.get_gnss_cov(z_gnss) #measurement noise covariance
+        
+        W =P@H.T@np.linalg.inv(H@P@H.T+R)
+        
+        I_WH = np.eye(*P.shape) - W @ H
+        P_upd = (I_WH @ P @ I_WH.T + W @ R @ W.T)
+                
+        mean = W @ (z_gnss.pos-z_gnss_pred_gauss.mean)
+        
+        x_err_upd_gauss = ErrorStateGauss(mean,P_upd,z_gnss.ts)
+        
+        #x_err_upd_gauss_sol = solution.eskf.ESKF.get_x_err_upd(self, x_nom, x_err, z_gnss_pred_gauss, z_gnss)
 
         return x_err_upd_gauss
 
@@ -407,9 +433,25 @@ class ESKF():
             x_err_inj (ErrorStateGauss): error state gaussian after injection
         """
 
-        # TODO replace this with your own code
-        x_nom_inj, x_err_inj = solution.eskf.ESKF.inject(
-            self, x_nom_prev, x_err_upd)
+        pos = x_nom_prev.pos + x_err_upd.pos
+        vel = x_nom_prev.vel + x_err_upd.vel
+        ori = x_nom_prev.ori.multiply(RotationQuaterion(real_part=1,vec_part=1/2*x_err_upd.avec))
+        accm_bias = x_nom_prev.accm_bias + x_err_upd.accm_bias
+        gyro_bias = x_nom_prev.gyro_bias + x_err_upd.gyro_bias
+        x_nom_inj = NominalState(pos,vel,ori,accm_bias,gyro_bias,x_err_upd.ts)
+        
+        x_err_mean = np.zeros_like(x_err_upd.mean)
+        G = np.zeros([15,15])
+        G[block_3x3(0,0)] = np.eye(3)
+        G[block_3x3(1,1)] = np.eye(3)
+        G[block_3x3(2,2)] = np.eye(3) - get_cross_matrix(1/2 * x_err_upd.avec)
+        G[block_3x3(3,3)] = np.eye(3)
+        G[block_3x3(4,4)] = np.eye(3)
+        P = x_err_upd.cov
+        P = G @ P @ G.T
+        x_err_inj = ErrorStateGauss(x_err_mean, P, x_err_upd.ts)
+        # x_nom_inj_sol, x_err_inj_sol = solution.eskf.ESKF.inject(
+        #     self, x_nom_prev, x_err_upd)
 
         return x_nom_inj, x_err_inj
 
@@ -434,9 +476,11 @@ class ESKF():
             z_gnss_pred_gauss (MultiVarGaussStamped): predicted gnss
                 measurement, used for NIS calculations.
         """
-
-        # TODO replace this with your own code
-        x_nom_inj, x_err_inj, z_gnss_pred_gauss = solution.eskf.ESKF.update_from_gnss(
-            self, x_nom_prev, x_err_prev, z_gnss)
+        
+        z_gnss_pred_gauss = self.predict_gnss_measurement(x_nom_prev,x_err_prev,z_gnss)
+        x_err_upd = self.get_x_err_upd(x_nom_prev,x_err_prev,z_gnss_pred_gauss,z_gnss)
+        x_nom_inj,x_err_inj=self.inject(x_nom_prev, x_err_upd) 
+        
+        #x_nom_inj_sol, x_err_inj_sol, z_gnss_pred_gauss_sol = solution.eskf.ESKF.update_from_gnss(self, x_nom_prev, x_err_prev, z_gnss)
 
         return x_nom_inj, x_err_inj, z_gnss_pred_gauss

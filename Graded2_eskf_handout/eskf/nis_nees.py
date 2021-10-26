@@ -24,9 +24,14 @@ def get_NIS(z_gnss: GnssMeasurement,
     Returns:
         NIS (float): NIS value
     """
-
-    # TODO replace this with your own code
-    NIS = solution.nis_nees.get_NIS(z_gnss, z_gnss_pred_gauss, marginal_idxs)
+    pos = z_gnss.pos
+    if marginal_idxs != None:
+        z_gnss_pred_gauss = z_gnss_pred_gauss.marginalize(marginal_idxs)
+        pos = pos[marginal_idxs]
+        
+    NIS = z_gnss_pred_gauss.mahalanobis_distance_sq(pos)
+        
+    # NIS_sol = solution.nis_nees.get_NIS(z_gnss, z_gnss_pred_gauss, marginal_idxs)
 
     return NIS
 
@@ -36,14 +41,22 @@ def get_error(x_true: NominalState,
               ) -> 'ndarray[15]':
     """Finds the error (difference) between True state and 
     nominal state. See (Table 10.1).
-
+    
 
     Returns:
         error (ndarray[15]): difference between x_true and x_nom. 
     """
-
-    # TODO replace this with your own code
-    error = solution.nis_nees.get_error(x_true, x_nom)
+    error = np.zeros(15)
+    error[:3] = x_true.pos - x_nom.pos
+    error[3:6] = x_true.vel - x_nom.vel
+    
+    d_q = x_nom.ori.conjugate().multiply(x_true.ori)
+    error[6:9] = d_q.as_avec()
+    
+    error[9:12] =  x_true.accm_bias - x_nom.accm_bias
+    error[12:15] = x_true.gyro_bias - x_nom.gyro_bias
+        
+    # error_sol = solution.nis_nees.get_error(x_true, x_nom)
 
     return error
 
@@ -63,9 +76,12 @@ def get_NEES(error: 'ndarray[15]',
     Returns:
         NEES (float): NEES value
     """
-
-    # TODO replace this with your own code
-    NEES = solution.nis_nees.get_NEES(error, x_err, marginal_idxs)
+    if marginal_idxs != None:
+        error = error[marginal_idxs]
+        x_err = x_err.marginalize(marginal_idxs)
+    NEES = x_err.mahalanobis_distance_sq(error)
+       
+    # NEES_sol = solution.nis_nees.get_NEES(error, x_err, marginal_idxs)
 
     return NEES
 
