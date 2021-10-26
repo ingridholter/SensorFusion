@@ -94,27 +94,6 @@ class ESKF():
             x_nom_pred (NominalState): predicted nominal state
         """
 
-        """""
-        acc = x_nom_prev.ori.as_rotmat()@(z_corr.acc - x_nom_prev.accm_bias) + self.g
-        avel = z_corr.avel - x_nom_prev.gyro_bias
-        ts = z_corr.ts
-
-        vel = x_nom_prev.vel + ts * acc
-        pos = x_nom_prev.pos + ts * x_nom_prev.vel + 1/2 * ts**2 * acc
-
-        k = ts*avel
-        quat = x_nom_prev.ori.multiply(np.array([np.cos(np.linalg.norm(
-            k) / 2), np.sin(np.linalg.norm(k) / 2) * k.T / np.linalg.norm(k)]).T)
-
-        accm_bias = x_nom_prev.accm_bias - ts * \
-            np.eye(3)*x_nom_prev.accm_bias*self.accm_bias_p
-        gyro_bias = x_nom_prev.gyro_bias - ts * \
-            np.eye(3)*x_nom_prev.gyro_bias*self.gyro_bias_p
-
-        x_nom_pred = NominalState(
-            pos=pos, vel=vel, ori=quat, accm_bias=accm_bias, gyro_bias=gyro_bias)
-        """
-
         x_nom_pred_sol = solution.eskf.ESKF.predict_nominal(
             self, x_nom_prev, z_corr)
         assert np.allclose(pos, x_nom_pred_sol.pos), "Position not correct"
@@ -420,7 +399,7 @@ class ESKF():
 
     def update_from_gnss(self,
                          x_nom_prev: NominalState,
-                         x_err_prev: NominalState,
+                         x_err_prev: ErrorStateGauss,
                          z_gnss: GnssMeasurement,
                          ) -> Tuple[NominalState,
                                     ErrorStateGauss,
@@ -429,13 +408,13 @@ class ESKF():
 
 
         Args:
-            x_nom_prev (NominalState): [description]
-            x_nom_prev (NominalState): [description]
+            x_nom_prev (NominalState): previous nominal state
+            x_err_prev (ErrorStateGauss): previous error state gaussian
             z_gnss (GnssMeasurement): gnss measurement
 
         Returns:
-            x_nom_inj (NominalState): previous nominal state 
-            x_err_inj (ErrorStateGauss): previous error state
+            x_nom_inj (NominalState): nominal state after injection
+            x_err_inj (ErrorStateGauss): error state gaussian after injection
             z_gnss_pred_gauss (MultiVarGaussStamped): predicted gnss 
                 measurement, used for NIS calculations.
         """

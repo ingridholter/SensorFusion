@@ -2,11 +2,11 @@ import numpy as np
 from numpy import ndarray
 from dataclasses import dataclass
 from scipy.spatial.transform import Rotation
+from cross_matrix import get_cross_matrix
 
 from config import DEBUG
 
 import solution
-from cross_matrix import get_cross_matrix
 
 
 @dataclass
@@ -46,7 +46,7 @@ class RotationQuaterion:
         q1@q2 which is equivalent to q1.multiply(q2)
 
         Args:
-            other (RotationQuaternion): the other quaternion
+            other (RotationQuaternion): the other quaternion    
         Returns:
             quaternion_product (RotationQuaternion): the product
         """
@@ -94,7 +94,7 @@ class RotationQuaterion:
         # R_sol = solution.quaternion.RotationQuaterion.as_rotmat(self)
         return R
 
-    @ property
+    @property
     def R(self) -> 'ndarray[3,3]':
         return self.as_rotmat()
 
@@ -104,6 +104,7 @@ class RotationQuaterion:
         Returns:
             euler (ndarray[3]): extrinsic xyz euler angles (roll, pitch, yaw)
         """
+
         quat = np.concatenate([self.vec_part, self.real_part], axis=None)
         r = Rotation.from_quat(quat)
         euler = r.as_euler('xyz')
@@ -115,8 +116,11 @@ class RotationQuaterion:
     def as_avec(self) -> 'ndarray[3]':
         """Get the angles vector representation of self
 
+        Hint: this is most often called rotation vector or rotvec. 
+
         Returns:
-            euler (ndarray[3]): extrinsic xyz euler angles (roll, pitch, yaw)
+            avec (ndarray[3]):  3 dimensional vector which is co-directional to
+                the axis of rotation and whose norm gives the angle of rotation
         """
 
         quat = np.concatenate([self.vec_part, self.real_part], axis=None)
@@ -125,7 +129,7 @@ class RotationQuaterion:
         # avec_sol = solution.quaternion.RotationQuaterion.as_avec(self)
         return avec
 
-    @ staticmethod
+    @staticmethod
     def from_euler(euler: 'ndarray[3]') -> 'RotationQuaterion':
         """Get a rotation quaternion from euler angles
         usage: rquat = RotationQuaterion.from_euler(euler)
