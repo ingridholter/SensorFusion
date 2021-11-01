@@ -1,5 +1,5 @@
 import numpy as np
-# set to 'sim' or 'real'
+# set to 'sim', 'eye' or 'real'
 RUN = 'sim'
 
 # set to False for speedup, skips sanity checks for in dataclasses

@@ -75,6 +75,15 @@ def main():
         tuning_params = tuning_sim.tuning_params_sim
         x_nom_init = tuning_sim.x_nom_init_sim
         x_err_init = tuning_sim.x_err_init_sim
+        
+    elif config.RUN == 'eye':
+        print(f"Running {config.MAX_TIME} seconds of simulated data set with identity matrices")
+        (x_true_data, z_imu_data, z_gnss_data, drone_params
+         ) = load_sim_data(config.MAX_TIME)
+        drone_params = ESKFStaticParams(accm_correction=np.eye(3),gyro_correction=np.eye(3),lever_arm=drone_params.lever_arm)
+        tuning_params = tuning_sim.tuning_params_sim
+        x_nom_init = tuning_sim.x_nom_init_sim
+        x_err_init = tuning_sim.x_err_init_sim
 
     elif config.RUN == 'real':
         print(f"Running {config.MAX_TIME} seconds of real data set")
