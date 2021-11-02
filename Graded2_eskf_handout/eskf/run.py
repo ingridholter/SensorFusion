@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 from dataclasses import asdict
+from scipy.stats import chi2
 
 from utils.dataloader import load_sim_data, load_real_data
 from datatypes.eskf_params import ESKFTuningParams, ESKFStaticParams
@@ -108,12 +109,27 @@ def main():
     NISxy_seq = [(get_NIS(z, pred, [0, 1])) for z, pred in z_true_pred_pairs]
     NISz_seq = [(get_NIS(z, pred, [2])) for z, pred in z_true_pred_pairs]
     plot_nis(NIS_times, NISxyz_seq, NISxy_seq, NISz_seq)
+   
+    ## ANIS 
+    N = len(z_true_pred_pairs)
+    confidence_interval = np.array(chi2.interval(0.90, 3*N))/N
+    print("\n ANIS")
+    print("Lower bound of 90 confidence interval: ", confidence_interval[0])
+    print("Upper bound of 90 confidence interval: ", confidence_interval[1])
+    print("ANIS, xyz: ", np.mean(NISxyz_seq))
+    print("ANIS, xy: ", np.mean(NISxy_seq))
+    print("ANIS, z: ", np.mean(NISz_seq))
+
 
     if x_true_data:
         x_times, x_true_nom_pairs = get_time_pairs(x_true_data,
                                                    x_nom_seq)
         errors = np.array([get_error(x_true, x_nom)
                            for x_true, x_nom in x_true_nom_pairs])
+        
+        rms_e_0 = np.sqrt(np.mean(errors[0,0]**2))
+        ## RMS Error
+        print("\n RMS Error x: ", rms_e_0)
         err_gt_est_pairs = list(zip(errors, x_err_gauss_seq))
         NEES_pos_seq = [(get_NEES(gt, est, [0, 1, 2]))
                         for gt, est in err_gt_est_pairs]
@@ -129,6 +145,18 @@ def main():
         plot_errors(x_times, errors)
         plot_nees(x_times, NEES_pos_seq, NEES_vel_seq,
                   NEES_avec_seq, NEES_accm_seq, NEES_gyro_seq)
+        
+        ## ANEES
+        N = len(NEES_pos_seq)
+        confidence_interval = np.array(chi2.interval(0.90, 3*N))/N
+        print("\n ANEES")
+        print("Lower bound of 90 confidence interval: ", confidence_interval[0])
+        print("Upper bound of 90 confidence interval: ", confidence_interval[1])
+        print("ANEES, pos: ", np.mean(NEES_pos_seq))
+        print("ANEES, vel: ", np.mean(NEES_vel_seq))
+        print("ANEES, avel: ", np.mean(NEES_avec_seq))
+        print("ANEES, accm: ", np.mean(NEES_accm_seq))
+        print("ANEES, gyro: ", np.mean(NEES_gyro_seq))
 
     plot_state(x_nom_seq)
     plot_position_path_3d(x_nom_seq, x_true_data)
