@@ -2,6 +2,7 @@ from typing import Tuple
 import numpy as np
 from numpy import ndarray
 from dataclasses import dataclass, field
+from numpy.core.shape_base import block
 from scipy.linalg import block_diag
 import scipy.linalg as la
 from utils import rotmat2d
@@ -33,12 +34,15 @@ class EKFSLAM:
         np.ndarray, shape = (3,)
             the predicted state
         """
-        # TODO replace this with your own code
-        xpred = solution.EKFSLAM.EKFSLAM.f(self, x, u)
-        return xpred
 
-        # TODO, eq (11.7). Should wrap heading angle between (-pi, pi), see utils.wrapToPi
-        xpred = None
+        # xpred_sol = solution.EKFSLAM.EKFSLAM.f(self, x, u)
+
+        # , eq (11.7). Should wrap heading angle between (-pi, pi), see utils.wrapToPi
+        psi = utils.wrapToPi(x[2])
+        phi = u[2]
+        xpred = np.array([x[0]+u[0]*np.cos(psi)-u[1]*np.sin(psi),
+                          x[1]+u[0]*np.sin(psi)+u[1]*np.cos(psi),
+                          psi + phi])
 
         return xpred
 
@@ -57,11 +61,14 @@ class EKFSLAM:
         np.ndarray
             The Jacobian of f wrt. x.
         """
-        # TODO replace this with your own code
-        Fx = solution.EKFSLAM.EKFSLAM.Fx(self, x, u)
-        return Fx
 
-        Fx = None  # TODO, eq (11.13)
+        # Fx_sol = solution.EKFSLAM.EKFSLAM.Fx(self, x, u)
+
+        # eq (11.13)
+        psi = utils.wrapToPi(x[2])
+        Fx = np.array([[1, 0, -u[0]*np.sin(psi)-u[1]*np.cos(psi)],
+                       [0, 1, u[0]*np.cos(psi)-u[1]*np.sin(psi)],
+                       [0, 0, 1]])
 
         return Fx
 
@@ -80,12 +87,14 @@ class EKFSLAM:
         np.ndarray
             The Jacobian of f wrt. u.
         """
-        # TODO replace this with your own code
-        Fu = solution.EKFSLAM.EKFSLAM.Fu(self, x, u)
-        return Fu
 
-        Fu = None  # TODO, eq (11.14)
+        #Fu_sol = solution.EKFSLAM.EKFSLAM.Fu(self, x, u)
 
+        # eq (11.14)
+        psi = utils.wrapToPi(x[2])
+        Fu = np.array([[np.cos(psi), -np.sin(psi), 0],
+                      [np.sin(psi), np.cos(psi), 0],
+                      [0, 0, 1]])
         return Fu
 
     def predict(
@@ -107,8 +116,7 @@ class EKFSLAM:
         Tuple[np.ndarray, np.ndarray], shapes= (3 + 2*#landmarks,), (3 + 2*#landmarks,)*2
             predicted mean and covariance of eta.
         """
-        etapred, P = solution.EKFSLAM.EKFSLAM.predict(self, eta, P, z_odo)
-        return etapred, P
+        #etapred_sol, P_sol = solution.EKFSLAM.EKFSLAM.predict(self, eta, P, z_odo)
 
         # check inout matrix
         assert np.allclose(P, P.T), "EKFSLAM.predict: not symmetric P input"
@@ -121,20 +129,24 @@ class EKFSLAM:
         etapred = np.empty_like(eta)
 
         x = eta[:3]
-        etapred[:3] = None  # TODO robot state prediction
-        etapred[3:] = None  # TODO landmarks: no effect
+        etapred[:3] = self.f(x, z_odo)  # TODO robot state prediction
+        etapred[3:] = eta[3:]  # TODO landmarks: no effect
 
-        Fx = None  # TODO
-        Fu = None  # TODO
+        Fx = self.Fx(x, z_odo)
+        Fu = self.Fu(x, z_odo)
 
         # evaluate covariance prediction in place to save computation
         # only robot state changes, so only rows and colums of robot state needs changing
         # cov matrix layout:
         # [[P_xx, P_xm],
         # [P_mx, P_mm]]
-        P[:3, :3] = None  # TODO robot cov prediction
-        P[:3, 3:] = None  # TODO robot-map covariance prediction
-        P[3:, :3] = None  # TODO map-robot covariance: transpose of the above
+
+        #P = FPF + GQG^T
+
+        P[:3, :3] = Fx@P[0:3, 0:3]@Fx.T+Fu@self.Q@Fu.T  # robot cov prediction
+        P[:3, 3:] = Fx @ P[:3, 3:]  # robot-map covariance prediction
+        # map-robot covariance: transpose of the above
+        P[3:, :3] = P[3:, :3] @ Fx.T
 
         assert np.allclose(P, P.T), "EKFSLAM.predict: not symmetric P"
         assert np.all(
@@ -160,9 +172,7 @@ class EKFSLAM:
             The landmarks in the sensor frame.
         """
 
-        # TODO replace this with your own code
-        zpred = solution.EKFSLAM.EKFSLAM.h(self, eta)
-        return zpred
+        zpred_sol = solution.EKFSLAM.EKFSLAM.h(self, eta)
 
         # extract states and map
         x = eta[0:3]
@@ -170,29 +180,32 @@ class EKFSLAM:
         m = eta[3:].reshape((-1, 2)).T
 
         Rot = rotmat2d(-x[2])
-
+        pos2D = x[0:2]
         # None as index ads an axis with size 1 at that position.
         # Numpy broadcasts size 1 dimensions to any size when needed
-        delta_m = None  # TODO, relative position of landmark to sensor on robot in world frame
+        # TODO, relative position of landmark to sensor on robot in world frame
+        delta_m = (m.T-pos2D)
 
         # TODO, predicted measurements in cartesian coordinates, beware sensor offset for VP
-        zpredcart = None
+        zpredcart = Rot@(delta_m-rotmat2d(x[2])*self.sensor_offset)
 
-        zpred_r = None  # TODO, ranges
-        zpred_theta = None  # TODO, bearings
-        zpred = None  # TODO, the two arrays above stacked on top of each other vertically like
+        zpred_r = la.norm(zpredcart, axis=0)  # TODO, ranges
+        zpred_theta = np.arctan2(
+            zpredcart[1, :], zpredcart[0, :])  # TODO, bearings
+        # TODO, the two arrays above stacked on top of each other vertically like
+        zpred = np.array([zpred_r, zpred_theta])
         # [ranges;
         #  bearings]
         # into shape (2, #lmrk)
 
-        # stack measurements along one dimension, [range1 bearing1 range2 bearing2 ...]
+        # #stack measurements along one dimension, [range1 bearing1 range2 bearing2 ...]
         zpred = zpred.T.ravel()
 
         assert (
             zpred.ndim == 1 and zpred.shape[0] == eta.shape[0] - 3
         ), "SLAM.h: Wrong shape on zpred"
 
-        return zpred
+        return zpred_sol
 
     def h_jac(self, eta: np.ndarray) -> np.ndarray:
         """Calculate the jacobian of h.
@@ -486,7 +499,7 @@ class EKFSLAM:
 
         return etaupd, Pupd, NIS, a
 
-    @classmethod
+    @ classmethod
     def NEESes(cls, x: np.ndarray, P: np.ndarray, x_gt: np.ndarray,) -> np.ndarray:
         """Calculates the total NEES and the NEES for the substates
         Args:

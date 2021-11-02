@@ -149,10 +149,10 @@ def main():
         # Transpose is to stack measurements rowwise
         # z_k = z[k][0].T
 
-        eta_hat[k], P_hat[k], NIS[k], a[k] =  # TODO update
+        eta_hat[k], P_hat[k], NIS[k], a[k] = 1  # TODO update
 
         if k < K - 1:
-            eta_pred[k + 1], P_pred[k + 1] =  # TODO predict
+            eta_pred[k + 1], P_pred[k + 1] = 1  # TODO predict
 
         assert (
             eta_hat[k].shape[0] == P_hat[k].shape[0]
@@ -169,7 +169,7 @@ def main():
             NISnorm[k] = 1
             CInorm[k].fill(1)
 
-        NEESes[k] =  # TODO, use provided function slam.NEESes
+        NEESes[k] = 1  # TODO, use provided function slam.NEESes
 
         if doAssoPlot and k > 0:
             axAsso.clear()
