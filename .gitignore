@@ -1,5 +1,5 @@
 #Big data files
-test_data.pickle
+slam_handout/tests/test_data.pickle
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
