@@ -172,22 +172,24 @@ class EKFSLAM:
             The landmarks in the sensor frame.
         """
 
-        zpred_sol = solution.EKFSLAM.EKFSLAM.h(self, eta)
-
         # extract states and map
         x = eta[0:3]
         # reshape map (2, #landmarks), m[:, j] is the jth landmark
         m = eta[3:].reshape((-1, 2)).T
 
-        Rot = rotmat2d(-x[2])
-        pos2D = x[0:2]
+        Rot_w = rotmat2d(x[2])  # world
+        Rot_b = rotmat2d(-x[2])  # body
+        pos2D = x[0:2].T
+        L_w = Rot_w @ self.sensor_offset  # L in world frame
+
         # None as index ads an axis with size 1 at that position.
         # Numpy broadcasts size 1 dimensions to any size when needed
         # TODO, relative position of landmark to sensor on robot in world frame
         delta_m = (m.T-pos2D)
 
         # TODO, predicted measurements in cartesian coordinates, beware sensor offset for VP
-        zpredcart = Rot@(delta_m-rotmat2d(x[2])*self.sensor_offset)
+        # Rot@(delta_m-rotmat2d(x[2])*self.sensor_offset)
+        zpredcart = Rot_b @ ((delta_m-L_w).T)
 
         zpred_r = la.norm(zpredcart, axis=0)  # TODO, ranges
         zpred_theta = np.arctan2(
@@ -200,12 +202,13 @@ class EKFSLAM:
 
         # #stack measurements along one dimension, [range1 bearing1 range2 bearing2 ...]
         zpred = zpred.T.ravel()
+        #zpred_sol = solution.EKFSLAM.EKFSLAM.h(self, eta)
 
         assert (
             zpred.ndim == 1 and zpred.shape[0] == eta.shape[0] - 3
         ), "SLAM.h: Wrong shape on zpred"
 
-        return zpred_sol
+        return zpred
 
     def h_jac(self, eta: np.ndarray) -> np.ndarray:
         """Calculate the jacobian of h.
@@ -220,8 +223,7 @@ class EKFSLAM:
         np.ndarray, shape=(2 * #landmarks, 3 + 2 * #landmarks)
             the jacobian of h wrt. eta.
         """
-        H = solution.EKFSLAM.EKFSLAM.h_jac(self, eta)
-        return H
+        H_sol = solution.EKFSLAM.EKFSLAM.h_jac(self, eta)
 
         # extract states and map
         x = eta[0:3]
@@ -230,17 +232,20 @@ class EKFSLAM:
 
         numM = m.shape[1]
 
-        Rot = rotmat2d(x[2])
+        Rot_w = rotmat2d(x[2])
+        Rot_b = rotmat2d-(x[2])
+        pos2D = x[0:2].T
 
         # TODO, relative position of landmark to robot in world frame. m - rho that appears in (11.15) and (11.16)
-        delta_m = None
+        delta_m = (m.T-pos2D)
 
         # TODO, (2, #measurements), each measured position in cartesian coordinates like
-        zc = None
+        zc = (delta_m-Rot_w@self.sensor_offset).T
         # [x coordinates;
         #  y coordinates]
 
-        zpred = None  # TODO (2, #measurements), predicted measurements, like
+        # TODO (2, #measurements), predicted measurements, like
+        zpred = None
         # [ranges;
         #  bearings]
         zr = None  # TODO, ranges
@@ -269,7 +274,7 @@ class EKFSLAM:
             # TODO: Set H or Hx and Hm here
 
         # TODO: You can set some assertions here to make sure that some of the structure in H is correct
-        return H
+        return H_sol
 
     def add_landmarks(
         self, eta: np.ndarray, P: np.ndarray, z: np.ndarray
