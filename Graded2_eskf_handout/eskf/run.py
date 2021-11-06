@@ -127,12 +127,17 @@ def main():
     N = len(z_true_pred_pairs)
     confidence_interval = np.array(chi2.interval(0.90, 3*N))/N
     print("\n ANIS")
+    print("ANIS, xyz: ", np.mean(NISxyz_seq))
     print("Lower bound of 90 confidence interval: ", confidence_interval[0])
     print("Upper bound of 90 confidence interval: ", confidence_interval[1])
-    print("ANIS, xyz: ", np.mean(NISxyz_seq))
     print("ANIS, xy: ", np.mean(NISxy_seq))
+    confidence_interval = np.array(chi2.interval(0.90, 2*N))/N
+    print("Lower bound of 90 confidence interval: ", confidence_interval[0])
+    print("Upper bound of 90 confidence interval: ", confidence_interval[1])
     print("ANIS, z: ", np.mean(NISz_seq))
-
+    confidence_interval = np.array(chi2.interval(0.90, 1*N))/N
+    print("Lower bound of 90 confidence interval: ", confidence_interval[0])
+    print("Upper bound of 90 confidence interval: ", confidence_interval[1])
 
     if x_true_data:
         x_times, x_true_nom_pairs = get_time_pairs(x_true_data,

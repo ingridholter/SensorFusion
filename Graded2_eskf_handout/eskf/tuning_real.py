@@ -15,7 +15,7 @@ tuning_params_real = ESKFTuningParams(
     gnss_std_ne=0.05,
     gnss_std_d=0.4,
 
-    use_gnss_accuracy=True)
+    use_gnss_accuracy=False)
 
 x_nom_init_real = NominalState(
     np.array([0., 0., 0.]),  # position
