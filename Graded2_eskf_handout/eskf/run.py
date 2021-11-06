@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 from dataclasses import asdict
+from scipy.stats import chi2
 
 from utils.dataloader import load_sim_data, load_real_data
 from datatypes.eskf_params import ESKFTuningParams, ESKFStaticParams
@@ -80,7 +81,8 @@ def main():
         print(f"Running {config.MAX_TIME} seconds of simulated data set with identity matrices")
         (x_true_data, z_imu_data, z_gnss_data, drone_params
          ) = load_sim_data(config.MAX_TIME)
-        drone_params = ESKFStaticParams(accm_correction=np.eye(3),gyro_correction=np.eye(3),lever_arm=drone_params.lever_arm)
+        drone_params = ESKFStaticParams(accm_correction=np.eye(3),gyro_correction=np.eye(3),
+                                        lever_arm=drone_params.lever_arm)
         tuning_params = tuning_sim.tuning_params_sim
         x_nom_init = tuning_sim.x_nom_init_sim
         x_err_init = tuning_sim.x_err_init_sim
@@ -90,6 +92,18 @@ def main():
         x_true_data = None
         (z_imu_data, z_gnss_data, drone_params
          ) = load_real_data(config.MAX_TIME)
+        tuning_params = tuning_real.tuning_params_real
+        x_nom_init = tuning_real.x_nom_init_real
+        x_err_init = tuning_real.x_err_init_real
+    
+    elif config.RUN == 'round':
+        print(f"Running {config.MAX_TIME} seconds of real data set with rounded matrices")
+        x_true_data = None
+        (z_imu_data, z_gnss_data, drone_params
+         ) = load_real_data(config.MAX_TIME)
+        drone_params = ESKFStaticParams(accm_correction=drone_params.accm_correction.round(1),
+                                        gyro_correction=drone_params.gyro_correction.round(1), 
+                                        lever_arm=drone_params.lever_arm)
         tuning_params = tuning_real.tuning_params_real
         x_nom_init = tuning_real.x_nom_init_real
         x_err_init = tuning_real.x_err_init_real
@@ -108,12 +122,32 @@ def main():
     NISxy_seq = [(get_NIS(z, pred, [0, 1])) for z, pred in z_true_pred_pairs]
     NISz_seq = [(get_NIS(z, pred, [2])) for z, pred in z_true_pred_pairs]
     plot_nis(NIS_times, NISxyz_seq, NISxy_seq, NISz_seq)
+   
+    ## ANIS 
+    N = len(z_true_pred_pairs)
+    confidence_interval = np.array(chi2.interval(0.90, 3*N))/N
+    print("\n ANIS")
+    print("ANIS, xyz: ", np.mean(NISxyz_seq))
+    print("Lower bound of 90 confidence interval: ", confidence_interval[0])
+    print("Upper bound of 90 confidence interval: ", confidence_interval[1])
+    print("ANIS, xy: ", np.mean(NISxy_seq))
+    confidence_interval = np.array(chi2.interval(0.90, 2*N))/N
+    print("Lower bound of 90 confidence interval: ", confidence_interval[0])
+    print("Upper bound of 90 confidence interval: ", confidence_interval[1])
+    print("ANIS, z: ", np.mean(NISz_seq))
+    confidence_interval = np.array(chi2.interval(0.90, 1*N))/N
+    print("Lower bound of 90 confidence interval: ", confidence_interval[0])
+    print("Upper bound of 90 confidence interval: ", confidence_interval[1])
 
     if x_true_data:
         x_times, x_true_nom_pairs = get_time_pairs(x_true_data,
                                                    x_nom_seq)
         errors = np.array([get_error(x_true, x_nom)
                            for x_true, x_nom in x_true_nom_pairs])
+        
+        rms_e_0 = np.sqrt(np.mean(errors[0,0]**2))
+        ## RMS Error
+        print("\n RMS Error x: ", rms_e_0)
         err_gt_est_pairs = list(zip(errors, x_err_gauss_seq))
         NEES_pos_seq = [(get_NEES(gt, est, [0, 1, 2]))
                         for gt, est in err_gt_est_pairs]
@@ -129,6 +163,18 @@ def main():
         plot_errors(x_times, errors)
         plot_nees(x_times, NEES_pos_seq, NEES_vel_seq,
                   NEES_avec_seq, NEES_accm_seq, NEES_gyro_seq)
+        
+        ## ANEES
+        N = len(NEES_pos_seq)
+        confidence_interval = np.array(chi2.interval(0.90, 3*N))/N
+        print("\n ANEES")
+        print("Lower bound of 90 confidence interval: ", confidence_interval[0])
+        print("Upper bound of 90 confidence interval: ", confidence_interval[1])
+        print("ANEES, pos: ", np.mean(NEES_pos_seq))
+        print("ANEES, vel: ", np.mean(NEES_vel_seq))
+        print("ANEES, avel: ", np.mean(NEES_avec_seq))
+        print("ANEES, accm: ", np.mean(NEES_accm_seq))
+        print("ANEES, gyro: ", np.mean(NEES_gyro_seq))
 
     plot_state(x_nom_seq)
     plot_position_path_3d(x_nom_seq, x_true_data)

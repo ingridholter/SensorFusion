@@ -175,3 +175,5 @@ def plot_nees(times, pos, vel, avec, accm, gyro, confidence=0.90):
     fig.subplots_adjust(left=0.15, right=0.97, bottom=0.06, top=0.94,
                         hspace=0.3)
     fig.savefig(plot_folder.joinpath('NEES.pdf'))
+    
+    
