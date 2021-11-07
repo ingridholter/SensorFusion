@@ -11,4 +11,4 @@ DEBUG = False
 DO_APPROXIMATIONS = True
 
 # max unning time set to np.inf to run through all the data
-MAX_TIME = 1200
+MAX_TIME = np.inf

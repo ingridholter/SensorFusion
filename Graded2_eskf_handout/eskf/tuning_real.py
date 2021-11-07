@@ -31,7 +31,7 @@ init_std_real = np.repeat(repeats=3,  # repeat each element 3 times
                           a=[1,  # position
                              10,  # velocity
                              np.deg2rad(10),  # angle vector
-                             0.01,  # accelerometer bias
+                             0.1,  # accelerometer bias
                              0.001])  # gyro bias
 
 x_err_init_real = ErrorStateGauss(np.zeros(15), np.diag(init_std_real**2), 0.)
