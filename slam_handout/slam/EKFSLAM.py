@@ -143,7 +143,7 @@ class EKFSLAM:
 
         # P = FPF + GQG^T
 
-        P[:3, :3] = Fx@P[0:3, 0:3]@Fx.T+Fu@self.Q@Fu.T  # robot cov prediction
+        P[:3, :3] = Fx@P[0:3, 0:3]@Fx.T + Fu@self.Q@Fu.T  # robot cov prediction
         P[:3, 3:] = Fx @ P[:3, 3:]  # robot-map covariance prediction
         # map-robot covariance: transpose of the above
         P[3:, :3] = P[3:, :3] @ Fx.T
@@ -443,7 +443,7 @@ class EKFSLAM:
         Tuple[np.ndarray, np.ndarray, float, np.ndarray]
             [description]
         """
-        # TODO replace this with your own code
+        # # TODO replace this with your own code
         # etaupd, Pupd, NIS, a = solution.EKFSLAM.EKFSLAM.update(self, eta, P, z)
         # return etaupd, Pupd, NIS, a
 
@@ -489,6 +489,7 @@ class EKFSLAM:
                 # same as adding Identity mat
                 jo[np.diag_indices(jo.shape[0])] += 1
                 # TODO, Kalman update. This is the main workload on VP after speedups
+                R = np.kron(np.eye(za.size // 2), self.R)
                 Pupd = jo @ P @ jo.T + W @ R @ W.T
 
                 # calculate NIS, can use S_cho_factors

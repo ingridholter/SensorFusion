@@ -149,13 +149,11 @@ def main():
         # Transpose is to stack measurements rowwise
         # z_k = z[k][0].T
 
-        eta_hat[k], P_hat[k], NIS[k], a[k] = EKFSLAM.update(
-            eta_pred[k], P_pred[k], z_k)  # TODO update
-
+        eta_hat[k], P_hat[k], NIS[k], a[k] = slam.update(eta_pred[k], P_pred[k], z_k)  # TODO update
         if k < K - 1:
             # TODO predict
             eta_pred[k + 1], P_pred[k +
-                                    1] = EKFSLAM.predict(eta_hat[k], P_hat[k], odometry[k, :])
+                                    1] = slam.predict(eta_hat[k], P_hat[k], odometry[k, :])
 
         assert (
             eta_hat[k].shape[0] == P_hat[k].shape[0]
@@ -163,7 +161,7 @@ def main():
 
         num_asso = np.count_nonzero(a[k] > -1)
 
-        CI[k] = chi2.interval(alpha, 2 * num_asso)
+        CI[k] = chi2.interval(1 - alpha, 2 * num_asso)
 
         if num_asso > 0:
             NISnorm[k] = NIS[k] / (2 * num_asso)
@@ -173,7 +171,7 @@ def main():
             CInorm[k].fill(1)
 
         # TODO, use provided function slam.NEESes
-        NEESes[k] = slam.NEESes(eta_hat[k], P_hat[k], poseGT[k])
+        NEESes[k] = slam.NEESes(eta_hat[k][0:3], P_hat[k][0:3,0:3], poseGT[k,:])
 
         if doAssoPlot and k > 0:
             axAsso.clear()
@@ -249,14 +247,14 @@ def main():
     dfs = [3, 2, 1]
 
     for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
-        CI_NEES = chi2.interval(alpha, df)
+        CI_NEES = chi2.interval(1 - alpha, df)
         ax.plot(np.full(N, CI_NEES[0]), '--')
         ax.plot(np.full(N, CI_NEES[1]), '--')
         ax.plot(NEES[:N], lw=0.5)
         insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
         ax.set_title(f'NEES {tag}: {insideCI.mean()*100}% inside CI')
 
-        CI_ANEES = np.array(chi2.interval(alpha, df*N)) / N
+        CI_ANEES = np.array(chi2.interval(1 - alpha, df*N)) / N
         print(f"CI ANEES {tag}: {CI_ANEES}")
         print(f"ANEES {tag}: {NEES.mean()}")
 
