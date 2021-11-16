@@ -99,19 +99,13 @@ def main():
     # %% Initilize
 
     # x,y,heading displacement
-    # 0.1, 0.1, 1 * np.pi / 180]
-    # greit: 0.07x2,0.6 // 0.05, 0.05, 0.5*1
-    # 0.73*0.07, 0.73*0.07, 0.75 * 0.6 * np.pi / 180 consistensy?
-    Q = np.diag([np.sqrt(0.0012), np.sqrt(0.0012), np.sqrt(0.000007)]) ** 2
+    Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2
 
     # range component, bearing
-    # 0.1, 1 * np.pi / 180, #greit: 0.08,1 // samme
-    # 0.73*0.08, 0.73*np.pi / 180] consistensy
-    R = np.diag([np.sqrt(0.001), np.sqrt(0.05*np.pi / 180)]) ** 2
+    R = np.diag([0.1, 1 * np.pi / 180]) ** 2
 
     # first is for joint compatibility, second is individual
-    # *2 consistenty
-    JCBBalphas = np.array([1e-4, 1e-6])  # 0.001, 0.0001
+    JCBBalphas = np.array([1e-3, 1e-4])  # 0.001, 0.0001
 
     doAsso = True
 
@@ -251,6 +245,15 @@ def main():
 
     ax3.set_title(f'NIS, {insideCI.mean()*100}% inside CI')
     fig3.savefig("NIS.pdf")
+    
+    # ANIS
+    total_lmks = 0
+    for l in lmk_est:
+        total_lmks += l.shape[0]
+    CI_ANIS = np.array(chi2.interval(1 - alpha, 2*total_lmks)) / total_lmks
+    ANIS = np.sum(NIS)/ total_lmks
+    print(f"CI ANIS: {CI_ANIS}")
+    print(f"ANEES: {ANIS}")
 
     # NEES
 
