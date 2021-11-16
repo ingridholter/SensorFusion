@@ -147,7 +147,7 @@ def main():
     N = K
 
     print("starting sim (" + str(N) + " iterations)")
-
+    tot_num_asso = 0
     for k, z_k in tqdm(enumerate(z[:N]), total=N):
         # See top: need to do "double indexing" to get z at time step k
         # Transpose is to stack measurements rowwise
@@ -165,6 +165,7 @@ def main():
         ), "dimensions of mean and covariance do not match"
 
         num_asso = np.count_nonzero(a[k] > -1)
+        tot_num_asso += num_asso
 
         CI[k] = chi2.interval(1 - alpha, 2 * num_asso)
 
@@ -217,8 +218,8 @@ def main():
 
     fig2, ax2 = plt.subplots(num=2, clear=True)
     # landmarks
-    ax2.scatter(*landmarks.T, c="r", marker="^")
-    ax2.scatter(*lmk_est_final.T, c="b", marker=".")
+    ax2.scatter(*landmarks.T, c="r", marker="^", label="Landmarks GT")
+    ax2.scatter(*lmk_est_final.T, c="b", marker=".", label="Landmarks est.")
     # Draw covariance ellipsis of measurements
     for l, lmk_l in enumerate(lmk_est_final):
         idxs = slice(3 + 2 * l, 3 + 2 * l + 2)
@@ -226,12 +227,14 @@ def main():
         el = ellipse(lmk_l, rI, 5, 200)
         ax2.plot(*el.T, "b")
 
-    ax2.plot(*poseGT.T[:2], c="r", label="gt")
-    ax2.plot(*pose_est.T[:2], c="g", label="est")
+    ax2.plot(*poseGT.T[:2], c="r", label="Pose GT")
+    ax2.plot(*pose_est.T[:2], c="g", label="Pose est.")
     ax2.plot(*ellipse(pose_est[-1, :2], P_hat[N - 1][:2, :2], 5, 200).T, c="g")
-    ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
+    ax2.set(title="Estimated pose and landmarks vs Ground Truth", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
+    ax2.set_xlabel('t [s]')
     ax2.axis("equal")
     ax2.grid()
+    ax2.legend(loc="upper right")
     fig2.savefig("results.pdf")
     # %% Consistency
 
@@ -242,16 +245,14 @@ def main():
     ax3.plot(CInorm[:N, 0], '--')
     ax3.plot(CInorm[:N, 1], '--')
     ax3.plot(NISnorm[:N], lw=0.5)
-
+    
+    ax3.set_xlabel('t [s]')
     ax3.set_title(f'NIS, {insideCI.mean()*100}% inside CI')
     fig3.savefig("NIS.pdf")
     
     # ANIS
-    total_lmks = 0
-    for l in lmk_est:
-        total_lmks += l.shape[0]
-    CI_ANIS = np.array(chi2.interval(1 - alpha, 2*total_lmks)) / total_lmks
-    ANIS = np.sum(NIS)/ total_lmks
+    CI_ANIS = np.array(chi2.interval(1 - alpha, 2*tot_num_asso)) / tot_num_asso
+    ANIS = np.sum(NIS)/ tot_num_asso
     print(f"CI ANIS: {CI_ANIS}")
     print(f"ANIS: {ANIS}")
 
