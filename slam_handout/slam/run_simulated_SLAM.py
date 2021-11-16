@@ -231,7 +231,8 @@ def main():
     ax2.plot(*pose_est.T[:2], c="g", label="Pose est.")
     ax2.plot(*ellipse(pose_est[-1, :2], P_hat[N - 1][:2, :2], 5, 200).T, c="g")
     ax2.set(title="Estimated pose and landmarks vs Ground Truth", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
-    ax2.set_xlabel('t [s]')
+    ax2.set_xlabel('x [m]')
+    ax2.set_ylabel('y [m]')
     ax2.axis("equal")
     ax2.grid()
     ax2.legend(loc="upper right")
@@ -246,7 +247,7 @@ def main():
     ax3.plot(CInorm[:N, 1], '--')
     ax3.plot(NISnorm[:N], lw=0.5)
     
-    ax3.set_xlabel('t [s]')
+    ax3.set_xlabel('k')
     ax3.set_title(f'NIS, {insideCI.mean()*100}% inside CI')
     fig3.savefig("NIS.pdf")
     
@@ -260,7 +261,7 @@ def main():
 
     fig4, ax4 = plt.subplots(nrows=3, ncols=1, figsize=(
         7, 5), num=4, clear=True, sharex=True)
-    tags = ['all', 'pos', 'heading']
+    tags = ['Pose', 'Position', 'Heading']
     dfs = [3, 2, 1]
 
     for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
@@ -269,12 +270,13 @@ def main():
         ax.plot(np.full(N, CI_NEES[1]), '--')
         ax.plot(NEES[:N], lw=0.5)
         insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
-        ax.set_title(f'NEES {tag}: {insideCI.mean()*100}% inside CI')
+        ax.set_title(f'NEES, {tag}: {insideCI.mean()*100}% inside CI')
 
         CI_ANEES = np.array(chi2.interval(1 - alpha, df*N)) / N
         print(f"CI ANEES {tag}: {CI_ANEES}")
         print(f"ANEES {tag}: {NEES.mean()}")
 
+    ax4[-1].set_xlabel('k')
     fig4.tight_layout()
     fig4.savefig("NEES.pdf")
     # %% RMSE
@@ -297,6 +299,7 @@ def main():
         ax.set_ylabel(f"[{ylabel}]")
         ax.grid()
 
+    ax5[-1].set_xlabel('k')
     fig5.tight_layout()
     fig5.savefig("RMSE.pdf")
 
