@@ -253,7 +253,7 @@ def main():
     CI_ANIS = np.array(chi2.interval(1 - alpha, 2*total_lmks)) / total_lmks
     ANIS = np.sum(NIS)/ total_lmks
     print(f"CI ANIS: {CI_ANIS}")
-    print(f"ANEES: {ANIS}")
+    print(f"ANIS: {ANIS}")
 
     # NEES
 
