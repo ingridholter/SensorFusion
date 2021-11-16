@@ -116,7 +116,7 @@ class EKFSLAM:
         Tuple[np.ndarray, np.ndarray], shapes= (3 + 2*#landmarks,), (3 + 2*#landmarks,)*2
             predicted mean and covariance of eta.
         """
-        # etapred_sol, P_sol = solution.EKFSLAM.EKFSLAM.predict(self, eta, P, z_odo)
+        #etapred_sol, P_sol = solution.EKFSLAM.EKFSLAM.predict(self, eta, P, z_odo)
 
         # check inout matrix
         assert np.allclose(P, P.T), "EKFSLAM.predict: not symmetric P input"
@@ -143,7 +143,8 @@ class EKFSLAM:
 
         # P = FPF + GQG^T
 
-        P[:3, :3] = Fx@P[0:3, 0:3]@Fx.T + Fu@self.Q@Fu.T  # robot cov prediction
+        P[:3, :3] = Fx@P[0:3, 0:3]@Fx.T + \
+            Fu@self.Q@Fu.T  # robot cov prediction
         P[:3, 3:] = Fx @ P[:3, 3:]  # robot-map covariance prediction
         # map-robot covariance: transpose of the above
         P[3:, :3] = P[3:, :3] @ Fx.T

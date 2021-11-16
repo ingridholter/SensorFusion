@@ -163,10 +163,10 @@ def main():
         odos = np.zeros((K, 3))
         odox = np.zeros((K, 3))
         odox[0] = eta
-
+        P_odo = P.copy()
         for k in range(min(N, K - 1)):
             odos[k + 1] = odometry(speed[k + 1], steering[k + 1], 0.025, car)
-            odox[k + 1], _ = slam.predict(odox[k], P, odos[k + 1])
+            odox[k + 1], _ = slam.predict(odox[k], P_odo, odos[k + 1])
 
     for k in tqdm(range(N)):
         if mk < mK - 1 and timeLsr[mk] <= timeOdo[k + 1]:
@@ -182,10 +182,10 @@ def main():
             # ? reset time to this laser time for next post predict
             t = timeLsr[mk]
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-            eta, P = slam.predict(eta, P, odo) # TODO predict
+            eta, P = slam.predict(eta, P, odo)  # TODO predict
 
             z = detectTrees(LASER[mk])
-            eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z)# TODO update
+            eta, P, NIS[mk], a[mk] = slam.update(eta, P, z)  # TODO update
 
             num_asso = np.count_nonzero(a[mk] > -1)
 

@@ -97,11 +97,21 @@ def main():
     M = len(landmarks)
 
     # %% Initilize
-    Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2  # TODO tune
-    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune
+
+    # x,y,heading displacement
+    # 0.1, 0.1, 1 * np.pi / 180]
+    # greit: 0.07x2,0.6 // 0.05, 0.05, 0.5*1
+    # 0.73*0.07, 0.73*0.07, 0.75 * 0.6 * np.pi / 180 consistensy?
+    Q = np.diag([np.sqrt(0.0012), np.sqrt(0.0012), np.sqrt(0.000007)]) ** 2
+
+    # range component, bearing
+    # 0.1, 1 * np.pi / 180, #greit: 0.08,1 // samme
+    # 0.73*0.08, 0.73*np.pi / 180] consistensy
+    R = np.diag([np.sqrt(0.001), np.sqrt(0.05*np.pi / 180)]) ** 2
 
     # first is for joint compatibility, second is individual
-    JCBBalphas = np.array([0.001, 0.0001])  # TODO tune
+    # *2 consistenty
+    JCBBalphas = np.array([1e-4, 1e-6])  # 0.001, 0.0001
 
     doAsso = True
 
@@ -149,7 +159,8 @@ def main():
         # Transpose is to stack measurements rowwise
         # z_k = z[k][0].T
 
-        eta_hat[k], P_hat[k], NIS[k], a[k] = slam.update(eta_pred[k], P_pred[k], z_k)  # TODO update
+        eta_hat[k], P_hat[k], NIS[k], a[k] = slam.update(
+            eta_pred[k], P_pred[k], z_k)  # TODO update
         if k < K - 1:
             # TODO predict
             eta_pred[k + 1], P_pred[k +
@@ -171,7 +182,8 @@ def main():
             CInorm[k].fill(1)
 
         # TODO, use provided function slam.NEESes
-        NEESes[k] = slam.NEESes(eta_hat[k][0:3], P_hat[k][0:3,0:3], poseGT[k,:])
+        NEESes[k] = slam.NEESes(eta_hat[k][0:3], P_hat[k]
+                                [0:3, 0:3], poseGT[k, :])
 
         if doAssoPlot and k > 0:
             axAsso.clear()
@@ -226,7 +238,7 @@ def main():
     ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
     ax2.axis("equal")
     ax2.grid()
-
+    fig2.savefig("results.pdf")
     # %% Consistency
 
     # NIS
@@ -238,6 +250,7 @@ def main():
     ax3.plot(NISnorm[:N], lw=0.5)
 
     ax3.set_title(f'NIS, {insideCI.mean()*100}% inside CI')
+    fig3.savefig("NIS.pdf")
 
     # NEES
 
@@ -259,7 +272,7 @@ def main():
         print(f"ANEES {tag}: {NEES.mean()}")
 
     fig4.tight_layout()
-
+    fig4.savefig("NEES.pdf")
     # %% RMSE
 
     ylabels = ['m', 'deg']
@@ -281,6 +294,7 @@ def main():
         ax.grid()
 
     fig5.tight_layout()
+    fig5.savefig("RMSE.pdf")
 
     # %% Movie time
 
