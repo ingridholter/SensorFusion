@@ -97,15 +97,11 @@ def main():
     M = len(landmarks)
 
     # %% Initilize
-
-    # x,y,heading displacement
-    Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2
-
-    # range component, bearing
-    R = np.diag([0.1, 1 * np.pi / 180]) ** 2
+    Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2  # TODO tune, 0.1, 0.1, 1 deg
+    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
 
     # first is for joint compatibility, second is individual
-    JCBBalphas = np.array([1e-3, 1e-4])  # 0.001, 0.0001
+    JCBBalphas = np.array([1e-3, 1e-4])  # TODO tune, 1e-3, 1e-4
 
     doAsso = True
 
@@ -220,6 +216,8 @@ def main():
     # landmarks
     ax2.scatter(*landmarks.T, c="r", marker="^", label="Landmarks GT")
     ax2.scatter(*lmk_est_final.T, c="b", marker=".", label="Landmarks est.")
+    print(f"N Landmarks, GT: {landmarks.size}")
+    print(f"N Landmarks, est: {lmk_est_final.size}")
     # Draw covariance ellipsis of measurements
     for l, lmk_l in enumerate(lmk_est_final):
         idxs = slice(3 + 2 * l, 3 + 2 * l + 2)
