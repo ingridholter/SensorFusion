@@ -145,7 +145,7 @@ def main():
     t = timeOdo[0]
 
     # %%  run
-    N = 10000  # K
+    N = 3000  # K
 
     doPlot = False
 
@@ -167,7 +167,8 @@ def main():
         for k in range(min(N, K - 1)):
             odos[k + 1] = odometry(speed[k + 1], steering[k + 1], 0.025, car)
             odox[k + 1], _ = slam.predict(odox[k], P_odo, odos[k + 1])
-
+            
+    tot_num_asso = 0
     for k in tqdm(range(N)):
         if mk < mK - 1 and timeLsr[mk] <= timeOdo[k + 1]:
             # Force P to symmetric: there are issues with long runs (>10000 steps)
@@ -188,6 +189,7 @@ def main():
             eta, P, NIS[mk], a[mk] = slam.update(eta, P, z)  # TODO update
 
             num_asso = np.count_nonzero(a[mk] > -1)
+            tot_num_asso += num_asso
 
             if num_asso > 0:
                 NISnorm[mk] = NIS[mk] / (2 * num_asso)
@@ -243,6 +245,12 @@ def main():
     ax3.plot(NISnorm[:mk], lw=0.5)
 
     ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
+    ax3.set_xlabel('k')
+    
+    CI_ANIS = np.array(chi2.interval(1 - alpha, 2*tot_num_asso)) / tot_num_asso
+    ANIS = np.sum(NIS)/ tot_num_asso
+    print(f"CI ANIS: {CI_ANIS}")
+    print(f"ANIS: {ANIS}")
 
     # %% slam
 
@@ -255,18 +263,24 @@ def main():
             marker=".",
             label="GPS",
         )
-        ax5.plot(*odox[:N, :2].T, label="odom")
+        ax5.plot(*odox[:N, :2].T, label="Odometry")
+        ax5.plot(*xupd[mk_first:mk, :2].T, label="Estimate")
         ax5.grid()
         ax5.set_title("GPS vs odometry integration")
+        ax5.set_xlabel('longitude [m]')
+        ax5.set_ylabel('latitude [m]')
         ax5.legend()
 
     # %%
     fig6, ax6 = plt.subplots(num=6, clear=True)
-    ax6.scatter(*eta[3:].reshape(-1, 2).T, color="r", marker="x")
-    ax6.plot(*xupd[mk_first:mk, :2].T)
+    ax6.scatter(*eta[3:].reshape(-1, 2).T, color="r", marker="x", label="Landmark est.")
+    ax6.plot(*xupd[mk_first:mk, :2].T, label="Pose est.")
     ax6.set(
         title=f"Steps {k}, laser scans {mk-1}, landmarks {len(eta[3:])//2},\nmeasurements {z.shape[0]}, num new = {np.sum(a[mk] == -1)}"
     )
+    ax6.set_xlabel('longitude [m]')
+    ax6.set_ylabel('latitude [m]')
+    ax6.legend()
     plt.show()
 
 
