@@ -110,13 +110,13 @@ def main():
 
     car = Car(L, H, a, b)
 
-    sigmas = 0.025 * np.array([0.0001, 0.00005, 6 * np.pi / 180])  # TODO tune
+    sigmas = np.array([2.5e-6, 1.25e-6, 0.15 * np.pi / 180])  # TODO tune, 2.5e-6, 1.25e-6, 0.15 deg
     CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
     Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
-    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune
+    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
 
     # first is for joint compatibility, second is individual
-    JCBBalphas = np.array([0.00001, 1e-6])  # TODO tune
+    JCBBalphas = np.array([1e-5, 1e-6])  # TODO tune, 1e-5, 1e-6
 
     sensorOffset = np.array([car.a + car.L, car.b])
     doAsso = True
@@ -245,7 +245,7 @@ def main():
     ax3.plot(NISnorm[:mk], lw=0.5)
 
     ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
-    ax3.set_xlabel('k')
+    ax3.set_xlabel('t [s]')
     
     CI_ANIS = np.array(chi2.interval(1 - alpha, 2*tot_num_asso)) / tot_num_asso
     ANIS = np.sum(NIS)/ tot_num_asso
