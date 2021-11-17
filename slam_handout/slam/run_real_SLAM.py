@@ -110,10 +110,15 @@ def main():
 
     car = Car(L, H, a, b)
 
-    sigmas = np.array([2.5e-6, 1.25e-6, 0.15 * np.pi / 180])  # TODO tune, 2.5e-6, 1.25e-6, 0.15 deg
+    sigmas = np.array([5e-4, 1.25e-4, 1.5 * np.pi / 180])  # TODO tune, 2.5e-6, 1.25e-6, 0.15 deg
     CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
     Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
-    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
+    R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
+    
+    # sigmas = np.array([2.5e-6, 1.25e-6, 0.15 * np.pi / 180])  # TODO tune, 2.5e-6, 1.25e-6, 0.15 deg
+    # CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
+    # Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
+    # R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
 
     # first is for joint compatibility, second is individual
     JCBBalphas = np.array([1e-5, 1e-6])  # TODO tune, 1e-5, 1e-6
@@ -145,7 +150,7 @@ def main():
     t = timeOdo[0]
 
     # %%  run
-    N = 3000  # K
+    N = 6000  # K
 
     doPlot = False
 
