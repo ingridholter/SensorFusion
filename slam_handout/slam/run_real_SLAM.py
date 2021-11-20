@@ -109,16 +109,12 @@ def main():
     b = 0.5  # laser distance to the left of center
 
     car = Car(L, H, a, b)
-
-    sigmas = np.array([5e-4, 1.25e-4, 1.5 * np.pi / 180])  # TODO tune, 2.5e-6, 1.25e-6, 0.15 deg
+    
+    sigmas = np.array([2.5e-6, 1.25e-6, 0.15 * np.pi / 180])  # TODO tune, 2.5e-6, 1.25e-6, 0.15 deg
     CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
     Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
-    R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
-    
-    # sigmas = np.array([2.5e-6, 1.25e-6, 0.15 * np.pi / 180])  # TODO tune, 2.5e-6, 1.25e-6, 0.15 deg
-    # CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
-    # Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
-    # R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
+    # Q = CorrCoeff
+    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
 
     # first is for joint compatibility, second is individual
     JCBBalphas = np.array([1e-5, 1e-6])  # TODO tune, 1e-5, 1e-6
@@ -174,6 +170,8 @@ def main():
             odox[k + 1], _ = slam.predict(odox[k], P_odo, odos[k + 1])
             
     tot_num_asso = 0
+    kgps = 1
+    err_GPS = np.zeros([len(timeGps - 1),1])
     for k in tqdm(range(N)):
         if mk < mK - 1 and timeLsr[mk] <= timeOdo[k + 1]:
             # Force P to symmetric: there are issues with long runs (>10000 steps)
@@ -206,6 +204,27 @@ def main():
                 CInorm[mk].fill(1)
 
             xupd[mk] = eta[:3]
+            
+            # GPS Error Calculation
+            t_next = timeLsr[mk + 1]
+            t_prev = timeLsr[mk - 1]
+            t_GPS = timeGps[kgps]
+            
+            dt_GPS = t_GPS - t
+            dt_GPS_next = t_next - t_GPS
+            dt_GPS_prev = t_GPS - t_prev
+            if abs(dt_GPS_prev) < abs(dt_GPS) :
+                err_GPS[kgps - 2] = np.linalg.norm(xupd[mk - 1, :2] - np.array([Lo_m[kgps], La_m[kgps]]))
+                kgps += 1
+                t_GPS = timeGps[kgps]
+            
+                dt_GPS = t_GPS - t
+                dt_GPS_next = t_next - t_GPS
+            if abs(dt_GPS_next) > abs(dt_GPS):              
+                err_GPS[kgps - 1] = np.linalg.norm(xupd[mk, :2] - np.array([Lo_m[kgps], La_m[kgps]]))
+                print(f"GPS TIME: {t_GPS}")
+                print(f"LASER TIME: {t}")
+                kgps += 1
 
             if doPlot:
                 sh_lmk.set_offsets(eta[3:].reshape(-1, 2))
@@ -251,6 +270,7 @@ def main():
 
     ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
     ax3.set_xlabel('t [s]')
+    fig3.savefig("NIS_real.pdf")
     
     CI_ANIS = np.array(chi2.interval(1 - alpha, 2*tot_num_asso)) / tot_num_asso
     ANIS = np.sum(NIS)/ tot_num_asso
@@ -275,6 +295,7 @@ def main():
         ax5.set_xlabel('longitude [m]')
         ax5.set_ylabel('latitude [m]')
         ax5.legend()
+        fig5.savefig("results_real.pdf")
 
     # %%
     fig6, ax6 = plt.subplots(num=6, clear=True)
@@ -286,6 +307,7 @@ def main():
     ax6.set_xlabel('longitude [m]')
     ax6.set_ylabel('latitude [m]')
     ax6.legend()
+    fig6.savefig("Estimates_real.pdf")
     plt.show()
 
 

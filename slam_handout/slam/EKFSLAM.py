@@ -458,7 +458,12 @@ class EKFSLAM:
 
             # Here you can use simply np.kron (a bit slow) to form the big (very big in VP after a while) R,
             # or be smart with indexing and broadcasting (3d indexing into 2d mat) realizing you are adding the same R on all diagonals
-            R = np.kron(np.eye(numLmk), self.R)
+            # R = np.kron(np.eye(numLmk), self.R)
+            m, n = self.R.shape
+            out = np.zeros((numLmk, m, numLmk, n), dtype=self.Q.dtype)
+            diag = np.einsum('ijik->ijk',out)
+            diag[:] = self.R
+            R = out.reshape(-1,n*numLmk)
             S = H @ P @ H.T + R  # TODO,
             assert (
                 S.shape == zpred.shape * 2

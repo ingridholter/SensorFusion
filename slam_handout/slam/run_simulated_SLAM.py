@@ -97,11 +97,11 @@ def main():
     M = len(landmarks)
 
     # %% Initilize
-    Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2  # TODO tune, 0.1, 0.1, 1 deg
+    Q = np.diag([0.025, 0.025, 0.4 * np.pi / 180]) ** 2  # TODO tune, 0.1, 0.1, 1 deg
     R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
 
     # first is for joint compatibility, second is individual
-    JCBBalphas = np.array([1e-3, 1e-4])  # TODO tune, 1e-3, 1e-4
+    JCBBalphas = np.array([1e-2, 1e-3])  # TODO tune, 1e-3, 1e-4
 
     doAsso = True
 
