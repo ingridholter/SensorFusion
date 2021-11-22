@@ -110,14 +110,22 @@ def main():
 
     car = Car(L, H, a, b)
     
+    # sigmas = np.array([2.5e-6, 1.25e-6, 0.15 * np.pi / 180])  # TODO tune, 2.5e-6, 1.25e-6, 0.15 deg
+    # CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
+    # Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
+    # # Q = CorrCoeff
+    # R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
+
+    # # first is for joint compatibility, second is individual
+    # JCBBalphas = np.array([1e-5, 1e-6])  # TODO tune, 1e-5, 1e-6
+    
     sigmas = np.array([2.5e-6, 1.25e-6, 0.15 * np.pi / 180])  # TODO tune, 2.5e-6, 1.25e-6, 0.15 deg
     CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
     Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
-    # Q = CorrCoeff
-    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
+    R = np.diag([1.5, 2 * np.pi / 180]) ** 2  # TODO tune, 0.1, 1 deg
 
     # first is for joint compatibility, second is individual
-    JCBBalphas = np.array([1e-5, 1e-6])  # TODO tune, 1e-5, 1e-6
+    JCBBalphas = np.array([1e-7, 1e-8])  # TODO tune, 1e-5, 1e-6
 
     sensorOffset = np.array([car.a + car.L, car.b])
     doAsso = True
@@ -146,7 +154,7 @@ def main():
     t = timeOdo[0]
 
     # %%  run
-    N = 6000  # K
+    N = K  # K
 
     doPlot = False
 
@@ -171,7 +179,7 @@ def main():
             
     tot_num_asso = 0
     kgps = 1
-    err_GPS = np.zeros([len(timeGps - 1),1])
+    err_GPS = np.zeros([Kgps - 1,1])
     for k in tqdm(range(N)):
         if mk < mK - 1 and timeLsr[mk] <= timeOdo[k + 1]:
             # Force P to symmetric: there are issues with long runs (>10000 steps)
@@ -213,17 +221,21 @@ def main():
             dt_GPS = t_GPS - t
             dt_GPS_next = t_next - t_GPS
             dt_GPS_prev = t_GPS - t_prev
-            if abs(dt_GPS_prev) < abs(dt_GPS) :
-                err_GPS[kgps - 2] = np.linalg.norm(xupd[mk - 1, :2] - np.array([Lo_m[kgps], La_m[kgps]]))
+            if abs(dt_GPS_prev) < abs(dt_GPS) and kgps < Kgps - 1:
+                err_GPS[kgps - 1] = np.linalg.norm(xupd[mk - 1, :2] - np.array([Lo_m[kgps], La_m[kgps]]))
+                # print(f"Estimate: {xupd[mk, :2]}")
+                # print(f"GPS: {np.array([Lo_m[kgps], La_m[kgps]])}")
+                # print(f"Error: {err_GPS[kgps - 1]}")
+                             
                 kgps += 1
                 t_GPS = timeGps[kgps]
-            
                 dt_GPS = t_GPS - t
                 dt_GPS_next = t_next - t_GPS
-            if abs(dt_GPS_next) > abs(dt_GPS):              
+            if abs(dt_GPS_next) > abs(dt_GPS) and kgps < Kgps - 1:              
                 err_GPS[kgps - 1] = np.linalg.norm(xupd[mk, :2] - np.array([Lo_m[kgps], La_m[kgps]]))
-                print(f"GPS TIME: {t_GPS}")
-                print(f"LASER TIME: {t}")
+                # print(f"Estimate: {xupd[mk, :2]}")
+                # print(f"GPS: {np.array([Lo_m[kgps], La_m[kgps]])}")
+                # print(f"Error: {err_GPS[kgps - 1]}")
                 kgps += 1
 
             if doPlot:
@@ -276,6 +288,10 @@ def main():
     ANIS = np.sum(NIS)/ tot_num_asso
     print(f"CI ANIS: {CI_ANIS}")
     print(f"ANIS: {ANIS}")
+    
+    # GPS RMSE
+    rmse_GPS = np.sqrt(np.mean(err_GPS**2))
+    print(f"RMSE GPS: {rmse_GPS}")
 
     # %% slam
 
